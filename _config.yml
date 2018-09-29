@@ -1,0 +1,19 @@
+repository: "pianroll/findroll"
+
+# Set the website to use local javascript/css only:
+#local: "true"
+local: "false"
+
+# Local preview server used. Leave as is:
+host: 127.0.0.1
+
+# Where to view the webiste for local display:
+port: 4321
+
+# Files and directories that jekyll will exclude from the build:
+exclude:
+  - .gitignore
+  - .git
+
+
+

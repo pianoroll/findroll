@@ -1,0 +1,103 @@
+
+<!-- Handlebars templates for main page.
+	vim: ts=3 ft=javascript
+	-->
+
+<!-- browse-template
+	This template is used to create a list of examples for browsing.
+-->
+
+{% raw %}
+<script id="browse-template" type="text/x-handlebars-template">
+
+Click on a composer/id to view the notation for that example.
+<br/>
+
+	{{#each this}}
+		<button class="btn entry" data-toggle="collapse" data-target="#{{id filename}}">{{{composer composer}}} {{{title title}}}</button>
+		<br>
+		<div id="{{id filename}}" class="collapse">
+			<div class="svg"></div>
+			{{notation this}}
+		</div>
+	{{/each}}
+
+</script>
+{% endraw %}
+
+
+<script>
+
+// template helper functions
+
+//////////////////////////////
+//
+// notation Handlebar helper -- Extract the numeric value of 
+//     the catalog number.
+//
+
+Handlebars.registerHelper("notation", function(obj) {
+	var filename = obj.filename;
+	var matches;
+	var id;
+	if (matches = filename.match(/(.*)\.[^.]*$/)) {
+		id = "Z_" + matches[1];
+	} else {
+		id = "Z_" + filename;
+	}
+
+	var output = "<pre style='display:none;' class='kern' id='" + id + "'>";
+	output += obj.kern;
+	output += "</pre>";
+
+	return new Handlebars.SafeString(output);
+});
+
+
+//////////////////////////////
+//
+// composer Handlebar helper -- Extract the numeric value of the catalog number.
+//
+
+Handlebars.registerHelper("composer", function(composer) {
+	composer = composer.replace(/Martinu/, "Martinů")
+	                   .replace(/Varese/, "Varèse")
+	                   .replace(/Janacek/, "Janáček")
+	                   .replace(/Bartok/, "Bartók");
+	var value = "<span class='composer'>" + composer + "</span>";
+	return new Handlebars.SafeString(value);
+});
+
+
+
+//////////////////////////////
+//
+// title Handlebar helper -- Extract the numeric value of the catalog number.
+//
+
+Handlebars.registerHelper("title", function(title) {
+	var value = "<span class='title'>" + title + "</span>";
+	return new Handlebars.SafeString(value);
+});
+
+
+
+//////////////////////////////
+//
+// id Handlebar helper -- Generate an id from filename.
+//
+
+Handlebars.registerHelper("id", function(filename) {
+	var id = "X";
+	var matches
+	if (matches = filename.match(/(.*)\.[^.]*$/)) {
+		id += matches[1];
+	} else {
+		id += filename;
+	}
+	return new Handlebars.SafeString(id);
+});
+
+
+</script>
+
