@@ -7,33 +7,29 @@ vim:      ts=3
 {% include_relative listeners.html %}
 {% include_relative templates.html %}
 {% include_relative scripts-local.html %}
+{% include_relative styles-local.html %}
 
-<style>
-.btn.entry:focus {
-	outline: none;
-	box-shadow: none;
-}
-
-.btn.entry {
-	border-width: 0px;
-	padding: 0px;
-}
-
-.composer {
-	color: #aa3333;
-}
-.title {
-	color: #3333aa;
-}
-</style>
-
+{% include_relative script-jsonformatter.html %}
 
 <section class="portfolio" id="portfolio">
 	<div class="container">
 		<h2 class="text-center text-uppercase text-secondary mb-0">Search</h2>
 		<hr class="star-dark mb-5">
 		<div class="row">
-			<div id="browse-list"></div>
+			<div style="margin-bottom:20px" id="search-form">
+				Total entries available for searching: <span id="total-entry-count">0</span>
+			</div>
+		</div>
+		<div class="row">
+			<div id="search-form">
+				{% include_relative search-form.html %}
+			</div>
+		</div>
+		<div class="row">
+			Matches: <span id="results-count">0</span>
+		</div>
+		<div class="row">
+			<div id="search-results"> </div>
 		</div>
 	</div>
 </section>

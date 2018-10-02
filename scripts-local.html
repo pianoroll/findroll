@@ -2,28 +2,333 @@
 <script>
 // vim: ts=3
 
-var DATABASE = {};
+var DATABASE      = [];
+var DATABASEBYGID = {};
 
 
 ///////////////////////////////
 //
-// prepareListOfWorks --
+// prepareListOfRolls -- Download and parse the master list, then download
+//    the individual spreadsheets for each collection in the master list.
 //
 
-function prepareListOfWorks() {
-/*
+function prepareListOfRolls() {
+	var sid = "1eNHQX4tuGJKMvP1fedZyqNnx9Zdh7QhO3hRf-hLL1TQ";
+	var url = "https://docs.google.com/spreadsheets/d/" + sid 
+		+ "/export?format=tsv&gid=0";
 	var request = new XMLHttpRequest();
-	request.open("GET", "url goes here");
+	request.open("GET", url);
 	request.onreadystatechange = function() {
 		if (this.readyState == 4 && this.status == 200) {
-			processFileList(this.responseText);
+			createDatabaseEntries(sid, 0, this.responseText);
 		}
 	};
 	request.send();
-*/
+}
+
+
+
+//////////////////////////////
+//
+// createDatabaseEntries -- Parse the master list of collections and
+//     then download the collections (one per spreadsheet).
+//
+
+function createDatabaseEntries(sid, gid, tsv) {
+	var lines = tsv.match(/[^\r\n]+/g);
+	DATABASE = [];
+	DATABASEBYGID = {};
+
+	if (lines.length == 0) {
+		console.log("ERROR: No lines in master index");
+		return;
+	}
+	
+	// first line is required to be list of column headings:
+	var headings = lines[0].split(/\t/);
+
+	if (headings.length < 1) {
+		console.log("Error on heading line:", lines[0]);
+		return;
+	}
+
+	// first heading is expected to be "GID":
+	if (headings[0] !== "GID") {
+		console.log("Error in first heading:", headings[0]);
+		return;
+	}
+
+	// second heading is expected to be "COLLECTION":
+	if (headings[1] !== "COLLECTION") {
+		console.log("Error in first heading:", headings[1]);
+		return;
+	}
+
+	// third heading is expected to be "LOCATION":
+	if (headings[2] !== "LOCATION") {
+		console.log("Error in first heading:", headings[2]);
+		return;
+	}
+
+	for (var i=1; i<lines.length; i++) {
+		var sheetObject = {};
+		sheetObject.info = {};
+		sheetObject.entries = [];
+		var data = lines[i].split(/\t/);
+		var maxj = headings.length;
+		if (data.length < headings.length) {
+			maxj = data.length;
+		}
+		var count = 0;
+		for (var j=0; j<maxj; j++) {
+			if (headings[j].match(/^\s*$/)) {
+				continue;
+			}
+			var key = headings[j];
+			var value = data[j];
+			sheetObject.info[key] = value;
+			count++;
+		}
+		if (count > 0) {
+			sheetObject.info["SID"] = sid;
+			DATABASE.push(sheetObject);
+			DATABASEBYGID[sheetObject.info["GID"]] = sheetObject;
+		} 
+	}
+
+	// download each roll collection
+	for (i=0; i<DATABASE.length; i++) {
+		downloadCollectionEntries(DATABASE[i]);
+	}
+
+}
+
+
+
+//////////////////////////////
+//
+// downloadCollectionEntries -- Download a spreadsheet for a particular
+//    collection, then parse its contents and store in DATABASE.
+//
+
+function downloadCollectionEntries(sheet) {
+	var sid = sheet.info.SID;
+	if (!sid) {
+		console.log("Error: SID is empty");
+		return;
+	}
+	var gid = sheet.info.GID;
+	if (!gid) {
+		console.log("Error: GID is empty");
+		return;
+	}
+	var url = "https://docs.google.com/spreadsheets/d/" + sid 
+		+ "/export?format=tsv&gid=" + gid;
+	var request = new XMLHttpRequest();
+	request.open("GET", url);
+	request.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+			storeDatabaseEntries(sheet, this.responseText);
+		}
+	};
+	request.send();
+}
+
+
+
+///////////////////////////////
+//
+// storeDatabaseEntries -- Receives downloaded content of a collection
+//    spreadsheet and store it in the DATABASE object.
+//
+
+function storeDatabaseEntries(sheetObject, tsv) {
+	var lines = tsv.match(/[^\r\n]+/g);
+	sheetObject.entries = [];
+	var index = 0;
+	while (1) {
+		if (lines.length <= index) {
+			// something went wrong (poorly formatted sheet)
+			console.log("ERROR: something went wrong (poorly formatted sheet)", gid);
+			return;
+		}
+		if (lines[index].match(/^\s*\*\*+/)) {
+			// this is the last line of the header, so break
+			break;
+		}
+		var matches;
+		if (matches = lines[index].match(/^([^\t]+)\s*\t\s*(.*?)\s*$/)) {
+			sheetObject.info[matches[1]] = matches[2];
+		}
+		index++;
+	}
+	if (!lines[index].match(/^\s*\*\*+/)) {
+		console.log("ERROR: something strange happened.");
+		return;
+	}
+	// The next line is the header giving the meaning of each column
+	index++;
+	if (index >= lines.length) {
+		// something bad happened (no entries on page)
+		console.log("ERROR: something bad happened");
+		return;
+	}
+	var headings = lines[index].split(/\t/);
+	index++;
+	if (index >= lines.length) {
+		// something bad happened (no entries on page)
+		return;
+	}
+
+	// now read the entries
+	for (var i=index; i<lines.length; i++) {
+		var data = lines[i].split(/\t/);
+		var maxj = headings.length;
+		if (data.length < headings.length) {
+			maxj = data.length;
+		}
+		var entry = {};
+		var count = 0;
+		for (var j=0; j<maxj; j++) {
+			if (headings[j].match(/^\s*$/)) {
+				continue;
+			}
+			var key = headings[j];
+			var value = data[j];
+			entry[key] = value;
+			count++;
+		}
+		if (count > 0) {
+			sheetObject.entries.push(entry);
+		} else {
+			// no data on sheet, so ignore
+			return;
+		}
+	}
+
+	// DATABASE.push(sheetObject);
+	displayTotalEntries();
+}
+
+
+
+//////////////////////////////
+//
+// setupMusicBrowseCallbacks --
+//
+
+function setupMusicBrowseCallbacks() {
+	var keywordElement = document.querySelector("#search-keyword");
+	if (keywordElement) {
+		keywordElement.addEventListener("input", function() { 
+			doSearch();
+		});
+	}
+}
+
+
+
+//////////////////////////////
+//
+// displayTotalEntries --
+//
+
+function displayTotalEntries() {
+	var countElement = document.querySelector("#total-entry-count");
+	if (!countElement) {
+		return;
+	}
+	var count = 0;
+	for (var i=0; i<DATABASE.length; i++) {
+		count += DATABASE[i].entries.length;
+	}
+	countElement.innerHTML = count;
+}
+
+
+
+//////////////////////////////
+//
+// doSearch --
+//
+
+function doSearch() {
+	var keywordElement = document.querySelector("#search-keyword");
+	if (!keywordElement) {
+		return;
+	}
+	var keytext = keywordElement.value;
+	var matches = [];
+
+	if (!keytext.match(/^\s*$/)) {
+		matches = doKeywordSearch(keytext, DATABASE);
+	}
+
+	console.log("MATCHES", matches);
+	var resultsElement = document.querySelector("#search-results");
+	if (matches.length > 0) {
+		Process(matches, resultsElement);
+	} else {
+		resultsElement.innerHTML = "";
+	}
+	
+	var resultsCountElement = document.querySelector("#results-count");
+	if (resultsCountElement) {
+		resultsCountElement.innerHTML = matches.length;
+	}
+}
+
+
+
+//////////////////////////////
+//
+// doKeywordSearch --
+//
+
+function doKeywordSearch(query, database) {
+console.log("QUERY", query);
+	var output = [];
+	for (var i=0; i<database.length; i++) {
+		var entries = database[i].entries;
+		if (!entries) {
+			continue;
+		}
+		for (var j=0; j<entries.length; j++) {
+			if (isMatch(query, entries[j])) {
+				output.push(entries[j]);
+			}
+		}
+	}
+	return output;
+}
+
+
+//////////////////////////////
+//
+// isMatch --
+//
+
+function isMatch(query, entry) {
+	console.log("CHECKING", entry);
+	var re = new RegExp(query, "i");
+
+	for (var property in entry) {
+		if (!entry.hasOwnProperty(property)) {
+			continue;
+		}
+		if (property === "GID") {
+			// do not search GID field
+			continue;
+		}
+		if (entry[property].match(re)) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 
 </script>
+
 
 
